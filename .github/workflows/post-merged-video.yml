@@ -1,0 +1,59 @@
+name: Merge & Post Video to Facebook
+
+on:
+  schedule:
+    # This cron job runs every 8 hours.
+    # The time is in UTC. '0 */8 * * *' means at minute 0 past every 8th hour (e.g., 00:00, 08:00, 16:00 UTC).
+    - cron: '0 */8 * * *'
+  workflow_dispatch: # This allows you to manually trigger the workflow from the GitHub Actions tab.
+
+jobs:
+  post-video:
+    runs-on: ubuntu-latest # The type of runner that the job will run on. Ubuntu is a good choice.
+
+    steps:
+    - name: Checkout repository # Step 1: Get your code from the repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python # Step 2: Configure the Python environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x' # Use the latest Python 3 version available
+
+    - name: Install system dependencies (for FFmpeg) # Step 3: Install FFmpeg, crucial for moviepy
+      run: |
+        sudo apt-get update           # Update package lists
+        sudo apt-get install -y ffmpeg # Install FFmpeg without asking for confirmation
+
+    - name: Install Python dependencies # Step 4: Install Python libraries
+      run: |
+        python -m pip install --upgrade pip # Upgrade pip
+        pip install cloudinary moviepy requests # Install required Python packages
+
+    - name: Restore posted media cache # Step 5: Restore the tracking file from cache (if it exists)
+      uses: actions/cache/restore@v4
+      with:
+        path: posted_media_tracker.json # The file that tracks previously used videos
+        # Key for the cache. Uses OS and a hash of Python files to invalidate if script changes.
+        key: ${{ runner.os }}-posted-media-cache-${{ hashFiles('**/*.py') }}
+        # If no exact match for key, try to restore from any key starting with this prefix
+        restore-keys: |
+          ${{ runner.os }}-posted-media-cache-
+
+    - name: Run video merge and Facebook post script # Step 6: Execute your main Python script
+      env:
+        # Inject Cloudinary API credentials as environment variables from GitHub Secrets
+        CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+        CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+        CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+        # Inject Facebook Page details as environment variables from GitHub Secrets
+        PAGE_ID: ${{ secrets.PAGE_ID }}
+        FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
+      run: python merge_and_post_to_facebook.py # Run the Python script
+
+    - name: Save posted media cache # Step 7: Save the updated tracking file back to cache
+      uses: actions/cache/save@v4
+      with:
+        path: posted_media_tracker.json
+        key: ${{ runner.os }}-posted-media-cache-${{ hashFiles('**/*.py') }}
+      if: success() # Only save the cache if the Python script ran successfully
