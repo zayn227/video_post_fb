@@ -10,28 +10,33 @@ on:
 
 jobs:
   post-video:
-    runs-on: ubuntu-latest # The type of runner that the job will run on. Ubuntu is a good choice.
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository # Step 1: Get your code from the repository
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Python # Step 2: Configure the Python environment
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.x' # Use the latest Python 3 version available
+        # Let's try a specific, widely used Python version if '3.x' is causing issues.
+        # Python 3.9 is a good stable choice for many libraries.
+        python-version: '3.9' 
 
-    - name: Install system dependencies (for FFmpeg) # Step 3: Install FFmpeg, crucial for moviepy
+    - name: Install system dependencies (for FFmpeg)
       run: |
         sudo apt-get update
         sudo apt-get install -y ffmpeg
 
     # --- IMPORTANT CHANGE HERE ---
-    - name: Clean Python cache and Install dependencies
+    - name: Clear Python cache and Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip cache purge # Add this line to clear pip cache
-        pip install cloudinary moviepy requests
+        pip cache purge # Clear pip cache again for good measure
+        # Install core dependencies explicitly for moviepy to ensure they're present.
+        # Sometimes moviepy's own install doesn't perfectly guarantee all sub-dependencies are accessible.
+        pip install numpy decorator imageio imageio[ffmpeg] tqdm requests
+        pip install moviepy cloudinary # Install moviepy and cloudinary last
     # --- END IMPORTANT CHANGE ---
 
     - name: Restore posted media cache
